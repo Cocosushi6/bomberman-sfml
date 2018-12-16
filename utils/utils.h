@@ -5,7 +5,7 @@
 #include <SFML/Network.hpp>
 
 const int TILE_SIZE = 32;
-bool hasFocus = true;
+extern bool hasFocus;
 
 struct InputState {
 	bool state;

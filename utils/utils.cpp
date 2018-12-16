@@ -4,6 +4,7 @@
 #include <SFML/System.hpp>
 #include <chrono>
 
+extern bool hasFocus = true;
 
 sf::Uint64 getTimestamp()
 {

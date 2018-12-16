@@ -104,7 +104,7 @@ int main_client() {
 			} else if(event.type == sf::Event::GainedFocus) {
 				hasFocus = true;
 			} else if(event.type == sf::Event::LostFocus) {
-				hasFocus = false
+				hasFocus = false;
 			}
 		}
 		client->poll();
