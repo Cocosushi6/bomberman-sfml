@@ -21,18 +21,18 @@ Client::~Client()
 	//TODO add call to disconnect() for sockets 
 }
 
-std::tuple<std::shared_ptr<Game>, int> Client::connect()
+tuple<unique_ptr<Game>, int> Client::connect()
 {
 	//server connection
 	Socket::Status status = m_tcpSock.connect(m_serverAddr, m_serverPort);
 	if(status != Socket::Done) {
 		cout << "Failed to connect tcp socket to server ! Aborting." << endl;
-		return std::make_tuple(nullptr, -1);
+		return make_tuple(nullptr, -1);
 	}
 	status = m_udpSock.bind(Socket::AnyPort);
 	if(status != Socket::Done) {
 		cout << "Failed to connect udp socket to server ! Aborting." << endl;
-		return std::make_tuple(nullptr, -1);
+		return make_tuple(nullptr, -1);
 	}
 	m_udpPort = m_udpSock.getLocalPort();
 	m_connected = true;
@@ -42,7 +42,7 @@ std::tuple<std::shared_ptr<Game>, int> Client::connect()
 	status = m_tcpSock.receive(gamePacket);
 	if(status != Socket::Done) {
 		cout << "Couldn't receive game data from server, aborting." << endl;
-		return std::make_tuple(nullptr, -1);
+		return make_tuple(nullptr, -1);
 	}
 	
 	//transform data
@@ -50,7 +50,7 @@ std::tuple<std::shared_ptr<Game>, int> Client::connect()
 	int id;
 	if(!(gamePacket >> id)) {
 		cout << "No id in packet. Aborting. " << endl;
-		return std::make_tuple(nullptr, -1);
+		return make_tuple(nullptr, -1);
 	}
 
 	if(id >= 0) {
@@ -58,17 +58,17 @@ std::tuple<std::shared_ptr<Game>, int> Client::connect()
 	}
 	
 	//Get game data
-	std::shared_ptr<Game> game = std::make_shared<Game>();
+	unique_ptr<Game> game = make_unique<Game>();
 	if(!(gamePacket >> *game)) {
 		cout << "Couldn't extract game data. Aborting." << endl;
-		return std::make_tuple(nullptr, -1);
+		return make_tuple(nullptr, -1);
 	}
 	
-	m_game = game;
+	m_game = game.get();
 
 	//Send back udp port
 	sf::Packet udpPort;
-	std::string descriptor = "UDPPORT";
+	string descriptor = "UDPPORT";
 	udpPort << descriptor << id << m_udpPort;
 	m_tcpSock.send(udpPort);
 	
@@ -76,7 +76,7 @@ std::tuple<std::shared_ptr<Game>, int> Client::connect()
 	m_udpSock.setBlocking(false);
 	cout << "Connected to server" << endl;
 
-	return std::make_tuple(game, id);
+	return make_tuple(move(game), id);
 }
 
 void Client::poll()
@@ -107,7 +107,7 @@ void Client::poll()
 			m_connected = false;
 		}
 	} else if(status == Socket::Done) {
-// 		cout << "tcp packet received" << endl;
+ 		cout << "Client.cpp : tcp packet received" << endl;
 		parsePacket(dataPacket);
 	} 
 	
@@ -124,98 +124,138 @@ void Client::poll()
 
 int Client::parsePacket(sf::Packet packet)
 {
-	while(!packet.endOfPacket()) {
-		std::shared_ptr<Game> game = m_game.lock();
-		
+	while (!packet.endOfPacket())
+	{
+
 		string descriptor;
-		if(!(packet >> descriptor)) {
+		if (!(packet >> descriptor))
+		{
 			cout << "No descriptor, failed to parse packet." << endl;
-			continue; 
-		} else {
-// 			cout << descriptor << endl;
+			continue;
 		}
-		
-		if(descriptor == "ADDBOMB") {
-			bomb_ptr_t b = make_shared<Bomb>(m_game);
-			if(!(packet >> *b)) continue;
-			game->addBomb(b->getID(), b);
-		} else if(descriptor == "BOMBEXPLODE") {
+
+
+		if (descriptor == "ADDBOMB")
+		{
+			bomb_ptr_t b = make_unique<Bomb>(m_game);
+			if (!(packet >> *b)) {
+				cout << "Couldn't unpack bomb !" << endl;
+				continue;
+			}			
+			cout << descriptor << b->toString() << endl;
+			int id = b->getID();
+			m_game->addBomb(id, move(b));
+		}
+		else if (descriptor == "BOMBEXPLODE")
+		{
 			int id;
-			if(!(packet >> id)) continue;
-			try {
-				weak_ptr<Bomb> b = game->getBomb(id);
-				if(auto bomb = b.lock()) {
-					bomb->explode();
-				}
-			} catch(std::out_of_range e) {
-				cout << "no bomb with id " << id << endl;
+			if (!(packet >> id))
+				continue;
+
+			Bomb *bomb = m_game->getBomb(id);
+			if (bomb != nullptr)
+			{
+				bomb->explode();
 			}
-			cout << game->toString() << endl;
-		} else if(descriptor == "REMOVEBOMB") {
+		}
+		else if (descriptor == "REMOVEBOMB")
+		{
 			int id;
-			if(!(packet >> id)) continue;
-			try {
-				weak_ptr<Bomb> b = game->getBomb(id);
-				if(auto bomb = b.lock()) {
-					bomb->die();
-				}
-			} catch(std::out_of_range e) {
-				cout << "no bomb with id " << id << endl;
+			if (!(packet >> id))
+				continue;
+
+			Bomb *bomb = m_game->getBomb(id);
+			if (bomb != nullptr)
+			{
+				bomb->die();
 			}
-			cout << game->toString() << endl;
-		} else if(descriptor == "ADDPLAYER") {
-			entity_ptr_t p = make_shared<Player>();
-			if(!(packet >> *p)) continue;
-			game->addEntity(p->getID(), p);
-		} else if(descriptor == "REMOVEPLAYER") {
+		}
+		else if (descriptor == "ADDPLAYER")
+		{
+			entity_ptr_t p = make_unique<Player>();
+			if (!(packet >> *p))
+				continue;
+
+			int id = p->getID();
+			m_game->addEntity(id, move(p)); //eval order is unspecified, so if move(p) is called before p->getID(), then ... SEGFAULT !
+		}
+		else if (descriptor == "REMOVEPLAYER")
+		{
 			int id;
-			if(!(packet >> id)) continue;
-			game->removeEntity(id);
-		} else if(descriptor == "PLAYERMOVE") {
+			if (!(packet >> id))
+				continue;
+			m_game->removeEntity(id);
+		}
+		else if (descriptor == "PLAYERMOVE")
+		{
 			int entID;
-			if(!(packet >> entID)) { cout << "skip" << endl; continue; }
-			if(auto curPlayer = game->getEntity(entID).lock()) {
+			if (!(packet >> entID))
+			{
+				cout << "skip" << endl;
+				continue;
+			}
+			Player* curPlayer = m_game->getEntity(entID);
+			if (curPlayer != nullptr)
+			{
 				sf::Uint64 timestamp;
 				//newX, newY and direction are the values at timestamp, server-side
-				float newX, newY, delta; 
-				std::string direction;
+				float newX, newY, delta;
+				string direction;
 				bool moving;
-				
-				if(!(packet >> timestamp >> delta >> newX >> newY >> direction >> moving)) { cout << "skip4" << endl; continue; }
-				if(entID == m_id) {
-					if(auto manager = curPlayer->getManager().lock()) { //TODO before using weak_ptr, check it's valid with weak_ptr.expired() (everywhere, just sidenote)
-						try {
+
+				if (!(packet >> timestamp >> delta >> newX >> newY >> direction >> moving))
+				{
+					cout << "skip4" << endl;
+					continue;
+				}
+				if (entID == m_id)
+				{
+					PlayerManager* manager = curPlayer->getManager();
+					if (manager != nullptr)
+					{ 
+						try
+						{
 							Player oldState = manager->getPStateMgr().get((sf::Uint64)timestamp);
-							
+
 							//Check validity
-							if(oldState.getNewX() != newX) {
+							if (oldState.getNewX() != newX)
+							{
 								float oldX = oldState.getX();
 								curPlayer->setX(newX);
 								curPlayer->setNewX(newX);
 								cout << timestamp;
-								cout << " correcting x, old : " << oldX << ", new : " << newX  << ", diff : " << newX - oldX << endl;
+								cout << " correcting x, old : " << oldX << ", new : " << newX << ", diff : " << newX - oldX << endl;
 							}
-							if(oldState.getNewY() != newY) {
+							if (oldState.getNewY() != newY)
+							{
 								float oldY = oldState.getY();
 								curPlayer->setY(newY);
 								curPlayer->setNewY(newY);
 								cout << timestamp;
 								cout << " correcting y, old : " << oldY << ", new : " << newY << ", diff : " << newY - oldY << endl;
-							} 
-							if(oldState.getDirection() != direction) {
+							}
+							if (oldState.getDirection() != direction)
+							{
 								curPlayer->setDirection(direction);
-							} 
-							if(oldState.isMoving() != moving) {
+							}
+							if (oldState.isMoving() != moving)
+							{
 								curPlayer->setMoving(moving);
 							}
-						} catch(std::out_of_range e) {
+						}
+						catch (out_of_range e)
+						{
 							cout << "no such state with timestamp " << timestamp << endl;
 						}
-					} else { 
-						cout << "skip2" << endl; 
+					}
+					else
+					{
+						cout << "Player does not have a valid PlayerManager" << endl;
 						continue;
 					}
-				} else {
+				}
+				else
+				{
 					cout << getTimestamp() << " moved other player, x : " << newX << ", y : " << newY << endl;
 					curPlayer->setLastDelta(delta);
 					curPlayer->setNewX(newX);
@@ -224,18 +264,17 @@ int Client::parsePacket(sf::Packet packet)
 					curPlayer->setMoving(moving);
 					curPlayer->udpate();
 				}
-			} else {
-				cout << "skip3" << endl; 
+			}
+			else
+			{
+				cout << "No such player in game !" << endl;
 				continue;
 			}
-			
 		}
 	}
-	
+
 	return 0;
 }
-
-
 
 int Client::sendTCP(sf::Packet packet)
 {

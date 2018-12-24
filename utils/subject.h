@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <SFML/System.hpp>
 
-typedef std::weak_ptr<Observer> obs_ptr_t;
+typedef Observer* obs_ptr_t;
 
 //Interface which contains methods for being observed and managing observers
 class Subject {
@@ -24,15 +24,16 @@ class Subject {
 			m_observers.erase(m_observers.begin() + index);
 		}
 	protected:
-		virtual void notify(int objectID, Event ev, sf::Uint64 timestamp = 0) {
+		virtual void notify(int objectID, ::Event ev, sf::Uint64 timestamp = 0) {
 			int i = 0;
 			std::vector<int> toRemove;
 			if(timestamp == 0) {
 				timestamp = getTimestamp();
 			}
+			
 			for(obs_ptr_t obs : m_observers) {
-				if(auto sobs = obs.lock()) {
-					sobs->onNotify(objectID, this, ev, timestamp);
+				if(obs != nullptr) {
+					obs->onNotify(objectID, this, ev, timestamp);
 				} else {
 					toRemove.push_back(i);
 				}

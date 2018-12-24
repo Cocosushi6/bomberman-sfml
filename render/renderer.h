@@ -13,14 +13,16 @@
 
 class Renderer;
 
+typedef std::unique_ptr<sf::RenderWindow> window_ptr_t;
+
 class PlayerRenderer {
 	public:
-		PlayerRenderer(std::weak_ptr<Player> player, std::shared_ptr<sf::RenderWindow> window);
+		PlayerRenderer(Player* player, sf::RenderWindow* window);
 		~PlayerRenderer();
 		void render(float delta);
 	private:
-		std::weak_ptr<Player> m_player;
-		std::shared_ptr<sf::RenderWindow> m_window;
+		Player* m_player;
+		sf::RenderWindow* m_window;
 		AnimatedSprite m_playerAnimSprite;
 		AnimatedSprite m_playerDeathAnimSprite;
 		sf::Texture m_playerStatic;
@@ -29,7 +31,7 @@ class PlayerRenderer {
 
 class Renderer : public Observer {
 	public:
-		Renderer(int localID, std::weak_ptr<Game> game, std::shared_ptr<sf::RenderWindow> window);
+		Renderer(int localID, Game* game, window_ptr_t window);
 		int init();
 		~Renderer();
         int loadTextures();
@@ -39,11 +41,14 @@ class Renderer : public Observer {
 		sf::Texture getTileTexture(std::string id) { return tileTextures[id]; }
 		sf::Texture getEntityTexture(std::string id) { return entityTextures[id]; }
 		virtual void onNotify(int objectID, Subject *sub, Event ev, sf::Uint64 timestamp);
-		void addPlayerRenderer(int id) { m_playerRenderers.insert(std::pair<int, PlayerRenderer>(id, PlayerRenderer(m_game.lock()->getEntity(id), m_window))); }
+		void addPlayerRenderer(int id) { 
+			m_playerRenderers.insert(std::pair<int, PlayerRenderer>(id, PlayerRenderer(m_game->getEntity(id), m_window.get()))); 
+		}
+		sf::RenderWindow* getWindow() { return m_window.get(); }
 	private:
-		std::weak_ptr<Game> m_game;
-		std::weak_ptr<Player> m_player;
-        std::shared_ptr<sf::RenderWindow> m_window;
+		Game* m_game;
+		Player* m_player;
+        std::unique_ptr<sf::RenderWindow> m_window;
         std::map<std::string, sf::Texture> tileTextures;
         std::map<std::string, sf::Texture> entityTextures;
 		std::map<int, PlayerRenderer> m_playerRenderers;

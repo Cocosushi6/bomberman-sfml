@@ -6,15 +6,15 @@
 
 using namespace std;
 
-Bomb::Bomb(int x, int y, float duration, std::weak_ptr<Game> game, int id) : m_x(x), m_y(y), m_duration(duration), m_game(game), m_id(id), m_elapsedTime(0.0f)
+Bomb::Bomb(int x, int y, float duration, Game* game, int id) : m_x(x), m_y(y), m_duration(duration), m_game(game), m_id(id), m_elapsedTime(0.0f)
 {
 }
 
-Bomb::Bomb(sf::Vector2i coordinates, float duration, std::weak_ptr<Game> game, int id) : m_x(coordinates.x), m_y(coordinates.y), m_duration(duration), m_game(game), m_id(id), m_elapsedTime(0.0f)
+Bomb::Bomb(sf::Vector2i coordinates, float duration, Game* game, int id) : m_x(coordinates.x), m_y(coordinates.y), m_duration(duration), m_game(game), m_id(id), m_elapsedTime(0.0f)
 {
 }
 
-Bomb::Bomb(std::weak_ptr<Game> game) : m_x(-200), m_y(-200), m_id(-1), m_duration(BOMB_DURATION), m_game(game), m_elapsedTime(0.0f)
+Bomb::Bomb(Game* game) : m_x(-200), m_y(-200), m_id(-1), m_duration(BOMB_DURATION), m_game(game), m_elapsedTime(0.0f)
 {
 }
 
@@ -27,30 +27,25 @@ void Bomb::explode()
 	if(!m_exploded) {
 		sf::FloatRect horizontal = sf::FloatRect(m_x-32, m_y, 96, 32);
 		sf::FloatRect vertical = sf::FloatRect(m_x, m_y-32, 32, 96);
-		if(auto game = m_game.lock()) {
-			std::map<int, entity_ptr_t> gameEntities = game->getEntities();
-			for(std::map<int, entity_ptr_t>::iterator it = gameEntities.begin(); it != gameEntities.end(); it++) {
+			map<int, Player*> gameEntities = m_game->getEntities();
+			for(auto it = gameEntities.begin(); it != gameEntities.end(); it++) {
 				if(it->second->getBounds().intersects(horizontal) || it->second->getBounds().intersects(vertical)) {
 					it->second->giveDamage(50);
 				} 
 			}
 			
 			sf::Vector2i tileCoords = sf::Vector2i(m_x / TILE_SIZE, m_y / TILE_SIZE);
-			for(std::vector<std::shared_ptr<Tile>> line : game->getTerrain().lock()->getTiles()) {
-				for(std::shared_ptr<Tile> t : line) {
+			for(vector<Tile*> line : m_game->getTerrain()->getTiles()) {
+				for(auto t : line) {
 					if(t->isBreakable()) {
 						if(t->getWorldCoordinates().x >= tileCoords.x-1 && t->getWorldCoordinates().x <= tileCoords.x +1) {
 							if(t->getWorldCoordinates().y >= tileCoords.y - 1 && t->getWorldCoordinates().y <= tileCoords.y + 1) {
-								game->getTerrain().lock()->breakTileAt(t->getWorldCoordinates().x, t->getWorldCoordinates().y, "stone");
+								m_game->getTerrain()->breakTileAt(t->getWorldCoordinates().x, t->getWorldCoordinates().y, "stone");
 							}
 						}
 					}
 				}
 			}
-		} else {
-			cout << "couldn't lock game" << endl;
-		}
-		
 		m_exploded = true;
 	}
 }
@@ -95,15 +90,15 @@ sf::Packet& operator>>(sf::Packet& packet, Bomb &bomb) {
 	return packet;
 }
 
-std::string Bomb::toString()
+string Bomb::toString()
 {
-	std::string result;
+	string result;
 	result += to_string(m_id) + " ";
 	result += to_string(m_x) + " ";
 	result += to_string(m_y) + " ";
 	result += to_string(m_elapsedTime) + " ";
-	result += ((m_exploded) ? "exploded" : "not_exploded") + (std::string)" ";
-	result += ((m_dead) ? "dead" : "not_dead") + (std::string)" ";
+	result += ((m_exploded) ? "exploded" : "not_exploded") + (string)" ";
+	result += ((m_dead) ? "dead" : "not_dead") + (string)" ";
 	return result;
 }
 

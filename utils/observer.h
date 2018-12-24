@@ -13,7 +13,7 @@ class Subject;
 class Observer {
 	public:
 		virtual ~Observer() {}
-		virtual void onNotify(int objectID, Subject *sender, Event ev, sf::Uint64 timestamp) = 0;
+		virtual void onNotify(int objectID, Subject *sender, ::Event ev, sf::Uint64 timestamp) = 0;
 	private:
 };
 

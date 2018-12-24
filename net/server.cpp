@@ -9,7 +9,7 @@
 using namespace std;
 using namespace sf;
 
-Server::Server(unsigned int tcpPort, unsigned int udpPort, std::weak_ptr<Game> game) : m_tcpPort(tcpPort), m_udpPort(udpPort), m_game(game)
+Server::Server(unsigned int tcpPort, unsigned int udpPort, Game* game) : m_tcpPort(tcpPort), m_udpPort(udpPort), m_game(game)
 {}
 
 int Server::init()
@@ -30,37 +30,41 @@ int Server::init()
 
 void Server::poll(float delta)
 {
-	if(m_sockSelector.wait(sf::milliseconds(25))) { 
+	if(m_sockSelector.wait(milliseconds(25))) { 
 		if(m_sockSelector.isReady(m_listener)) {
 			
-			tcp_sock_ptr_t socket(new TcpSocket()); //TODO replace with make_shared
+			tcp_sock_ptr_t socket = make_unique<TcpSocket>();
 			Socket::Status status = m_listener.accept(*socket);
 			
 			if(status == Socket::Done) {
 				//Client is added here, and marked ready once it has sent back its UDP port (see parsePacket method)
-				int newID = m_game.lock()->attribID();
-				m_game.lock()->addEntity(newID, std::make_shared<Player>(50, 50, m_game, newID));
-				rclient_ptr_t newClient = std::make_shared<RemoteClient>(newID, -1, socket->getRemoteAddress(), socket);
-				addClient(newID, newClient);
+				//TODO add method in game.h to create a new player -> the game should handle the spawn mechanics, etc. and return a new id
+				int newID = m_game->attribID();
+				m_game->addEntity(newID, move(make_unique<Player>(50, 50, m_game, newID)));
 				
 				//send back its id
 				Packet clientData;
-				clientData << newID << *m_game.lock(); //warning : might bug !
+				clientData << newID << *m_game;
 				socket->send(clientData);
 				
 				m_sockSelector.add(*socket);
+				//TODO add method in server.h, class Server, to register a new client with the specified parameters
+				IpAddress socketAddr = socket->getRemoteAddress();
+				rclient_ptr_t newClient = make_unique<RemoteClient>(newID, -1, socketAddr, move(socket));
+				addClient(newID, move(newClient));
+
 				cout << "Added new client ! ID : " << newID << endl;
 			} else {
 				cout << "Error while adding new Client ! Status : " << status << endl;
 			}
 		}
-		for(std::map<int, rclient_ptr_t>::iterator it = m_clients.begin(); it != m_clients.end(); ++it) {
-			rclient_ptr_t client = it->second;
-			tcp_sock_ptr_t sock = client->getOutputSocket();
+		for(auto it = m_clients.begin(); it != m_clients.end(); ++it) {
+			RemoteClient* client = it->second.get();
+			TcpSocket* sock = client->getOutputSocket();
 			if(m_sockSelector.isReady(*sock)) {
-				sf::Packet packet;
+				Packet packet;
 				Socket::Status status = sock->receive(packet);
-				if(status == sf::Socket::Done) {
+				if(status == Socket::Done) {
 					parsePacket(packet, client->getIpAddress());
 				} else {
 					cout << "Error while receiving packet of client with id " << it->second->getId() << ", status is " << status << endl;
@@ -69,7 +73,7 @@ void Server::poll(float delta)
 						cout << "Player with id " << discoID << " was disconnected. " << endl;
 						removeClient(discoID);
 						m_sockSelector.remove(*sock);
-						m_game.lock()->removeEntity(discoID);
+						m_game->removeEntity(discoID);
 						m_tcpDataPacket << "REMOVEPLAYER" << discoID;
 						cout << "removed all data concerning client with id " << discoID << endl;
 						//bug with iterator (which loops again, even if m_clientManager.getClients() is empty), is avoided here (was segfaulting before)
@@ -79,10 +83,10 @@ void Server::poll(float delta)
 			}
 		}
 		if(m_sockSelector.isReady(m_udpSocket)) {
-			sf::IpAddress sender;
+			IpAddress sender;
 			unsigned short int port;
-			sf::Packet packet;
-			sf::Socket::Status status = m_udpSocket.receive(packet, sender, port);
+			Packet packet;
+			Socket::Status status = m_udpSocket.receive(packet, sender, port);
 			if(status != Socket::Done) {
 				cout << "Error while receiving UDP packet from address " << sender << endl;
 			} else {
@@ -93,7 +97,7 @@ void Server::poll(float delta)
 	
 	//TODO change this
 	//update timeSincelastBombPosed of remote clients (this is part of the really ugly things to change later)
-	for(std::map<int, rclient_ptr_t>::iterator it = m_clients.begin(); it != m_clients.end(); it++) {
+	for(map<int, rclient_ptr_t>::iterator it = m_clients.begin(); it != m_clients.end(); it++) {
 		it->second->lastBombPost(it->second->getLastBombPostTime() + delta);
 	}
 	
@@ -101,23 +105,28 @@ void Server::poll(float delta)
 	if(m_udpDataPacket.getData() != NULL) {
 		sendUDPToAll(m_udpDataPacket);
 		m_udpDataPacket.clear();
-		cout << "sent udp packet" << endl;
 	}
 	if(m_tcpDataPacket.getData() != NULL) {
 		sendTCPToAll(m_tcpDataPacket);
 		m_tcpDataPacket.clear();
-		cout << "sent tcp packet "<< endl;
+		cout << "Sent TCP packet to all clients" << endl;
 	}
 }
 
-int Server::sendTCP(int clientID, sf::Packet packet)
+int Server::sendTCP(int clientID, Packet packet)
 {
-	if(m_clients.at(clientID)->isReady()) {
-		tcp_sock_ptr_t out = m_clients.at(clientID)->getOutputSocket();
+	cout << "Sending packet !" << endl;
+	RemoteClient* client = getClient(clientID);
+	if(client == nullptr) { 
+		cout << "SendTCP : no such client with id " << clientID << endl;
+		return -2; 
+	}
+	if(client->isReady()) {
+		TcpSocket* out = client->getOutputSocket();
 		
-		sf::Socket::Status status =  out->send(packet);
+		Socket::Status status =  out->send(packet);
 		if(status != Socket::Done) {
-			std::string str;
+			string str;
 			if(status == Socket::Error) {
 				str= "error";
 			} else if(status == Socket::Disconnected) {
@@ -132,17 +141,19 @@ int Server::sendTCP(int clientID, sf::Packet packet)
 			return -1;
 		}
 		return 0;
+	} else {
+		cout << "Client not ready ! not sending packet. " << endl;
 	}
 }
 
-int Server::sendUDP(int clientID, sf::Packet packet)
+int Server::sendUDP(int clientID, Packet packet)
 {
-	if(m_clients.at(clientID)->isReady()) {
-		IpAddress recipient = m_clients.at(clientID)->getIpAddress();
-		int clientPort = m_clients.at(clientID)->getUDPPort();
-		
-		if(m_udpSocket.send(packet, recipient, clientPort) != Socket::Done) {
-			cout << "Error while sending UDP data to " << recipient << ". " << endl;
+	RemoteClient* client = getClient(clientID);
+	if(client == nullptr) { return -2; }
+
+	if(client->isReady()) {
+		if(m_udpSocket.send(packet, client->getIpAddress(), client->getUDPPort()) != Socket::Done) {
+			cout << "Error while sending UDP data to " << client->getIpAddress() << ". " << endl;
 			return -1;
 		}
 	}
@@ -150,20 +161,21 @@ int Server::sendUDP(int clientID, sf::Packet packet)
 	return 0;
 }
 
-void Server::sendTCPToAll(sf::Packet packet) {
-	for(std::map<int, rclient_ptr_t>::iterator it = m_clients.begin(); it != m_clients.end(); it++) {
+void Server::sendTCPToAll(Packet packet) {
+	for(auto it = m_clients.begin(); it != m_clients.end(); it++) {
+		cout << "sending to : " << it->first << endl;
 		sendTCP(it->first, packet);
 	}
 }
 
-void Server::sendUDPToAll(sf::Packet packet)
+void Server::sendUDPToAll(Packet packet)
 {
-	for(std::map<int, rclient_ptr_t>::iterator it = m_clients.begin(); it != m_clients.end(); it++) {
+	for(auto it = m_clients.begin(); it != m_clients.end(); it++) {
 		sendUDP(it->first, packet);
 	}
 }
 
-int Server::parsePacket(sf::Packet packet, sf::IpAddress sender)
+int Server::parsePacket(Packet packet, IpAddress sender)
 {
 	while(!packet.endOfPacket()) {
 		string descriptor;
@@ -185,7 +197,7 @@ int Server::parsePacket(sf::Packet packet, sf::IpAddress sender)
 				cout << "Sender's IP address does not match the ID he has sent. To prevent spoofing, the packet will be discarded" << endl;
 				continue;
 			}
-		} catch(std::out_of_range e) {
+		} catch(out_of_range e) {
 			cout << "no such client" << endl;
 			continue;
 		}
@@ -193,48 +205,59 @@ int Server::parsePacket(sf::Packet packet, sf::IpAddress sender)
 		if(descriptor == "UDPPORT") {
 			int udpPort;
 			if(!(packet >> udpPort)) continue;
-			rclient_ptr_t client = m_clients.at(clientID);
-			client = std::make_shared<RemoteClient>(*client, udpPort); //warning, might bug
-			m_clients[clientID] = client;
+
+			RemoteClient* client = getClient(clientID);
+			if(client == nullptr) continue;
+			client->setUDPPort(udpPort);
+			client->setReady();
+
 			cout << "Client sent UDP port" << endl;
+
 		} else if(descriptor == "ADDBOMB") {
-			if(auto game = m_game.lock()) {
-				cout << game->toString() << endl;
-				if(m_clients.at(clientID)->getLastBombPostTime() >= 0.3f) {
-					if(auto player = game->getEntity(clientID).lock()) {
-						// the + SPRITE_SIZE / 2 is to have the position under the player's feet
-						sf::Vector2<int> bombCoords = toTileCoordinates((int)(player->getX() + SPRITE_SIZE / 2), (int)(player->getY() + SPRITE_SIZE / 2 + 5)) * TILE_SIZE; 
-						
-						std::shared_ptr<Bomb> b = std::make_shared<Bomb>(bombCoords.x, bombCoords.y, BOMB_DURATION, m_game, game->attribID());
-						game->addBomb(b->getID(), b);
-						m_clients.at(clientID)->lastBombPost(0.0f);
-					}
+			cout << descriptor << endl;
+
+			RemoteClient* client = getClient(clientID);
+			if(client == nullptr) {
+				cout << "Client is nullptr ! not adding bomb" << endl;
+				continue; 
+			}
+			if(client->getLastBombPostTime() >= 0.3f) {
+				auto player = m_game->getEntity(clientID);
+				if(player != nullptr) {
+					// the + SPRITE_SIZE / 2 is to have the position under the player's feet
+					Vector2<int> bombCoords = toTileCoordinates((int)(player->getX() + SPRITE_SIZE / 2), (int)(player->getY() + SPRITE_SIZE / 2 + 5)) * TILE_SIZE; 
+					
+					unique_ptr<Bomb> b = make_unique<Bomb>(bombCoords.x, bombCoords.y, BOMB_DURATION, m_game, m_game->attribID());
+					int id = b->getID();
+					m_game->addBomb(id, move(b));
+					client->lastBombPost(0.0f);
 				} else {
-					cout << "Client " << clientID << " tries to add too much bombs ! (delta : " << m_clients.at(clientID)->getLastBombPostTime() << ")"  << endl;
+					cout << descriptor << " : no such player with id : " << clientID << endl;
 				}
 			} else {
-				cout << "Couldn't lock game ptr" << endl;
+				cout << "Client " << clientID << " tries to add too much bombs ! (delta : " << m_clients.at(clientID)->getLastBombPostTime() << ")"  << endl;
 			}
 		} else if(descriptor == "INPUTSTATE") {
-			if(auto p = m_game.lock()->getEntity(clientID).lock()) {
+			auto p = m_game->getEntity(clientID);
+			if(p != nullptr) {
 				InputState state;
 				if(!(packet >> state)) { cout << "skip" << endl; continue; }
 				bool currentlyMoving = true; //TODO break here check state
 				if(state.state) {
 					switch(state.key) {
-						case sf::Keyboard::S :
+						case Keyboard::S :
 							p->move(0.0f, 1.0f, state.delta);
 							p->setDirection("down");
 							break;
-						case sf::Keyboard::Z : 
+						case Keyboard::Z : 
 							p->move(0.0f, -1.0f, state.delta);
 							p->setDirection("up");
 							break;
-						case sf::Keyboard::Q :
+						case Keyboard::Q :
 							p->move(-1.0f, 0.0f, state.delta);
 							p->setDirection("left");
 							break;
-						case sf::Keyboard::D : 
+						case Keyboard::D : 
 							p->move(1.0f, 0.0f, state.delta);
 							p->setDirection("right");
 							break;
@@ -255,27 +278,25 @@ int Server::parsePacket(sf::Packet packet, sf::IpAddress sender)
 	return 0;
 }
 
-void Server::onNotify(int objectID, Subject *sub, ::Event ev, sf::Uint64 timestamp)
+void Server::onNotify(int objectID, Subject *sub, ::Event ev, Uint64 timestamp)
 {
 	if(ev == EVENT_BOMB_ADD) {
-		if(auto game = m_game.lock()) {
-			m_tcpDataPacket << "ADDBOMB" << *game->getBomb(objectID).lock();
-		}
+		Bomb *bomb = m_game->getBomb(objectID);
+		cout << bomb->toString() << endl;
+		m_tcpDataPacket << "ADDBOMB" << *(m_game->getBomb(objectID));
 	} else if(ev == EVENT_BOMB_EXPLODED) {
 		m_tcpDataPacket << "BOMBEXPLODE" << objectID;
 	} else if(ev == EVENT_BOMB_DIED) {
 		m_tcpDataPacket << "REMOVEBOMB" << objectID;
 	} else if(ev == EVENT_PLAYER_JOIN) {
-		if(auto game = m_game.lock()) {
-			m_tcpDataPacket << "ADDPLAYER" << *game->getEntity(objectID).lock();
-		}
+		m_tcpDataPacket << "ADDPLAYER" << *(m_game->getEntity(objectID));
 	}
 	//TODO check all events fired in game and implement something for them here (eg : ADDPLAYER)
 }
 
 void Server::addClient(int id, rclient_ptr_t client)
 {
-	m_clients.insert(std::pair<int, rclient_ptr_t>(id, client));
+	m_clients.insert(pair<int, rclient_ptr_t>(id, move(client)));
 }
 
 void Server::removeClient(int id)
@@ -283,9 +304,14 @@ void Server::removeClient(int id)
 	m_clients.erase(id);
 }
 
-std::weak_ptr<RemoteClient> Server::getClient(int id)
+RemoteClient* Server::getClient(int id)
 {
-	return m_clients.at(id);
+	try {
+		return m_clients.at(id).get();
+	} catch(out_of_range ex) {
+		cout << "No such remote client for id " << id << endl;
+		return nullptr;
+	}
 }
 
 RemoteClient::RemoteClient()
@@ -293,12 +319,7 @@ RemoteClient::RemoteClient()
 	
 }
 
-RemoteClient::RemoteClient(const RemoteClient& copy, int port) : m_id(copy.m_id), m_address(copy.m_address), m_udpPort(port), m_tcpSocket(copy.m_tcpSocket), ready(true)
-{
-	
-}
-
-RemoteClient::RemoteClient(int id, unsigned int udpPort, sf::IpAddress address, tcp_sock_ptr_t tcpSocket, bool ready) : m_id(id), m_address(address), m_udpPort(udpPort), m_tcpSocket(tcpSocket), ready(ready)
+RemoteClient::RemoteClient(int id, unsigned int udpPort, IpAddress address, tcp_sock_ptr_t tcpSocket, bool ready) : m_id(id), m_address(address), m_udpPort(udpPort), m_tcpSocket(move(tcpSocket)), ready(ready)
 {
 	
 }

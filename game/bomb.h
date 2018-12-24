@@ -16,9 +16,9 @@ const float BOMB_DURATION = 2.0f;
 
 class Bomb : public Subject {
 	public:
-		Bomb(int x, int y, float duration, std::weak_ptr<Game> game, int id);
-		Bomb(sf::Vector2i coordinates, float duration, std::weak_ptr<Game> game, int id);
-		Bomb(std::weak_ptr<Game> game);
+		Bomb(int x, int y, float duration, Game* game, int id);
+		Bomb(sf::Vector2i coordinates, float duration, Game* game, int id);
+		Bomb(Game* game);
 		~Bomb();
 		void update(float delta);
 		void explode();
@@ -43,13 +43,13 @@ class Bomb : public Subject {
 		int getID() { return m_id; }
 		void setID(int id) { m_id = id; }
 		std::string toString();
-		void setGame(std::weak_ptr<Game> game) { m_game = game; }
+		void setGame(Game* game) { m_game = game; }
 	private:
 		int m_x, m_y;
 		int m_id = -1;
 		float m_duration;
 		float m_elapsedTime = 0.0f;
-		std::weak_ptr<Game> m_game;
+		Game* m_game;
 		bool m_exploded = false;
 		bool m_dead = false;
 		float m_periodBeforeDead = 0.3f;

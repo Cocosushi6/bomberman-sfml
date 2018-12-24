@@ -14,7 +14,7 @@ const int SPRITE_SIZE = 64;
 	
 class Player {
 	public:
-		Player(float x, float y, std::weak_ptr<Game> game, int id, std::weak_ptr<PlayerManager> manager = std::weak_ptr<PlayerManager>()); //last argument is equivalent to nullptr if not defined
+		Player(float x, float y, Game* game, int id, PlayerManager* manager = nullptr);
 		Player();
         ~Player();
 		void move(float newX, float newY, float delta); 
@@ -40,9 +40,9 @@ class Player {
 		int getHP();
 		int getID() { return m_id; }
 		void setID(int id) { m_id = id; }
-		std::weak_ptr<PlayerManager> getManager() { return m_pManager; }
-		void setManager(std::weak_ptr<PlayerManager> p) { m_pManager = p; }
-		void setGame(std::weak_ptr<Game> game) { m_game = game; }
+		PlayerManager* getManager() { return m_pManager; }
+		void setManager(PlayerManager* p) { m_pManager = p; }
+		void setGame(Game* game) { m_game = game; }
 		std::string toString();
 		void setLastDelta(float last) { m_lastDelta = last; }
 		float getNewX() { return m_newX; }
@@ -53,12 +53,12 @@ class Player {
 		float m_speed;
 		bool m_moving;
 		std::string m_direction;
-		std::weak_ptr<Game> m_game;
+		Game* m_game = nullptr;
 		int m_hp;
 		bool m_dead;
 		int m_id;
 		float m_lastDelta = 0.0f;
-		std::weak_ptr<PlayerManager> m_pManager;
+		PlayerManager* m_pManager = nullptr;
 };
 
 sf::Packet& operator<<(sf::Packet& packet, Player &player);

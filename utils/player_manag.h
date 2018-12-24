@@ -7,11 +7,11 @@
 #include "../game/player.h"
 #include "observer.h"
 
-typedef std::weak_ptr<Player> player_ptr_t;
+typedef Player* player_ptr_t;
 
 class PlayerManager : public Observer {
 	public:
-		PlayerManager(std::weak_ptr<Game> game, int playerID);
+		PlayerManager(Game* game, int playerID);
 		player_ptr_t getPlayer() { return m_player; }
 		int getPlayerID() { return m_playerID; }
 		PlayerStateManager& getPStateMgr() { return m_pStateManager; }

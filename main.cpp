@@ -32,13 +32,13 @@ int main() {
 }
 
 int main_server() {
-	std::shared_ptr<Game> game = std::make_shared<Game>();
+	unique_ptr<Game> game = make_unique<Game>();
 	game->init();
-	std::shared_ptr<Server> server = std::make_shared<Server>(1665, 1665, game);
+	unique_ptr<Server> server = make_unique<Server>(1665, 1665, game.get());
 	if(server->init() != 0) {
 		return -1;
 	}
-	game->addObserver(server);
+	game->addObserver(server.get());
 	
 	bool running = true;
 	sf::Clock clock;
@@ -52,55 +52,56 @@ int main_server() {
 }
 
 int main_client() {
-    std::shared_ptr<sf::RenderWindow> window = std::make_shared<sf::RenderWindow>(sf::VideoMode(800, 608), "test", sf::Style::Titlebar | sf::Style::Close);
+    unique_ptr<sf::RenderWindow> window = make_unique<sf::RenderWindow>(sf::VideoMode(800, 608), "test", sf::Style::Titlebar | sf::Style::Close);
     window->setFramerateLimit(60);
     
-	std::shared_ptr<Client> client = std::make_shared<Client>("127.0.0.1", 1665);
-	std::tuple<std::shared_ptr<Game>, int> result = client->connect();
-    std::shared_ptr<Game> game = std::get<0>(result);
-	int ID = std::get<1>(result);
+	unique_ptr<Client> client = make_unique<Client>("127.0.0.1", 1665);
+	tuple<unique_ptr<Game>, int> result = client->connect();
+    unique_ptr<Game> game = move(get<0>(result));
+	int ID = get<1>(result);
 	if(game == nullptr || ID == -1) {
 		cout << "couldn't fetch data from server" << endl;
 		return -1;
 	}
 	game->init();
-	client->addObserver(game);
+	client->addObserver(game.get());
 	
 	cout << "game and id fetched successfully" << endl;
 	
-	std::shared_ptr<PlayerManager> playerManager = std::make_shared<PlayerManager>(game, ID);
+	unique_ptr<PlayerManager> playerManager = make_unique<PlayerManager>(game.get(), ID);
 	//TODO add playerManager->init() here
-	if(auto player = game->getEntity(ID).lock()) {
-		player->setManager(playerManager); //Some sort of "use" of the component pattern
-		player->setGame(game);
+	auto player = game->getEntity(ID);
+	if(player != nullptr) {
+		player->setManager(playerManager.get()); //Some sort of "use" of the component pattern
+		player->setGame(game.get());
 	} else {
 		return -1;
 	}
 	
 	cout << "local player manager initialised" << endl;
 	
-    std::shared_ptr<Renderer> renderer = std::make_shared<Renderer>(ID, game, window);
+    unique_ptr<Renderer> renderer = make_unique<Renderer>(ID, game.get(), move(window));
 	if(renderer->init() != 0) {
 		cout << "failed to create renderer" << endl;
 		return -2;
 	}
-	game->addObserver(renderer);
-    std::shared_ptr<Input> inputManager = std::make_shared<Input>(game->getEntity(ID).lock(), game);
-	inputManager->addObserver(playerManager); //To add player state
+	game->addObserver(renderer.get());
+    unique_ptr<Input> inputManager = make_unique<Input>(game->getEntity(ID), game.get());
+	inputManager->addObserver(playerManager.get()); //To add player state
 	
 	cout << "renderer and input manager initialised" << endl;
 	
     sf::Clock clock;
 	cout << "Init done ! " << endl;
 	
-	while(window->isOpen()) {
+	while(renderer->getWindow()->isOpen()) {
 		//TODO take a look at delta pattern and implement it correctly in game
         sf::Time elapsed = clock.restart();
         
 		sf::Event event;
-		while(window->pollEvent(event)) {
+		while(renderer->getWindow()->pollEvent(event)) {
 			if(event.type == sf::Event::Closed) {
-				window->close();
+				renderer->getWindow()->close();
 			} else if(event.type == sf::Event::GainedFocus) {
 				hasFocus = true;
 			} else if(event.type == sf::Event::LostFocus) {
@@ -109,12 +110,12 @@ int main_client() {
 		}
 		client->poll();
 		
-		window->clear(sf::Color::Black);
-		inputManager->parseInput(elapsed.asSeconds(), client);
+		renderer->getWindow()->clear(sf::Color::Black);
+		inputManager->parseInput(elapsed.asSeconds(), client.get());
 		game->update(elapsed.asSeconds());
         renderer->render(elapsed.asSeconds());
 		
-		window->display();
+		renderer->getWindow()->display();
 	}
 	
 	cout << "Ending game" << endl;

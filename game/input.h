@@ -10,11 +10,11 @@
 
 class Input : public Subject {
 	public:
-		Input(std::weak_ptr<Player> player, std::weak_ptr<Game> game);
-		void parseInput(float delta, std::weak_ptr<Client> sendback);
+		Input(Player* layer, Game* game);
+		void parseInput(float delta, Client* sendback);
 	private:
-        std::weak_ptr<Player> m_player;
-		std::weak_ptr<Game> m_game;
+		Player* m_player;
+		Game* m_game;
 		float m_elapsedSinceBombPosing = 0.0f; // This has nothing to do here
 		std::map<sf::Keyboard::Key, bool> m_keyStates;
 };

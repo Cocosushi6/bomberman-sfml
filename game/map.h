@@ -40,15 +40,16 @@ class Tile {
 		bool m_breakable = false;
 };
 
-typedef std::shared_ptr<Tile> tile_ptr_t;
+typedef std::unique_ptr<Tile> tile_ptr_t;
 
 class Terrain : public Subject {
 	public:
         Terrain();
+        Terrain(std::vector<std::vector<tile_ptr_t>> &tiles);
         ~Terrain();
-		std::shared_ptr<Tile> getTileAt(int x, int y);
-        std::vector<std::vector<tile_ptr_t>> getTiles() { return m_tiles; }
-        void setTiles(std::vector<std::vector<tile_ptr_t>> tiles) { m_tiles = tiles; }
+		Tile* getTileAt(int x, int y);
+        std::vector<std::vector<Tile*>> getTiles();
+        void setTiles(std::vector<std::vector<tile_ptr_t>> tiles);
         void breakTileAt(int worldX, int worldY, std::string newTileType);
 		void printWorld();
 	private:

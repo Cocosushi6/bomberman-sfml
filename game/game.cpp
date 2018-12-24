@@ -7,20 +7,20 @@
 
 using namespace std;
 
-Game::Game() : m_terrain(std::make_shared<Terrain>()) {
+Game::Game() : m_terrain(make_unique<Terrain>()) {
 }
 
-Game::Game(std::shared_ptr<Terrain> terrain, std::map<int, entity_ptr_t> entities) : m_terrain(terrain), m_entities(entities) {
+Game::Game(unique_ptr<Terrain> terrain, map<int, entity_ptr_t> entities) : m_terrain(move(terrain)), m_entities(move(entities)) {
 }
 
 int Game::init()
 {
-	m_terrain->addObserver(shared_from_this());
+	m_terrain->addObserver(this);
 	return 0;
 }
 
 void Game::addEntity(int id, entity_ptr_t entity) {
-    m_entities.insert(std::pair<int, entity_ptr_t>(id, entity));
+	m_entities[id] = move(entity);
 	notify(id, EVENT_PLAYER_JOIN, getTimestamp());
 }
 
@@ -29,18 +29,18 @@ void Game::removeEntity(int id) {
    notify(id, EVENT_PLAYER_PART, getTimestamp());
 }
 
-void Game::addBomb(int id, std::shared_ptr<Bomb> bomb) { 
-	m_bombs.insert(std::pair<int, bomb_ptr_t>(id, bomb));
-	bomb->addObserver(shared_from_this());
-	bomb->setGame(shared_from_this());
+void Game::addBomb(int id, unique_ptr<Bomb> bomb) { 
+	bomb->addObserver(this);
+	bomb->setGame(this);
+	m_bombs[id] = move(bomb);
 	notify(id, EVENT_BOMB_ADD, getTimestamp());
 // 	cout << "added bomb " << id << endl;
 }
 
 void Game::update(float delta) {
 	//update bombs 
-	std::vector<int> bombsToRemove;
-    for(std::map<int, bomb_ptr_t>::iterator it = m_bombs.begin(); it != m_bombs.end(); it++) {		
+	vector<int> bombsToRemove;
+    for(auto it = m_bombs.begin(); it != m_bombs.end(); it++) {		
 		it->second->update(delta);
 		if(it->second->isDead()) {
 			cout << "bomb is dead, removing" << endl;
@@ -52,7 +52,7 @@ void Game::update(float delta) {
 	}
 	
 	//update entities
-	for(std::map<int, entity_ptr_t>::iterator it = m_entities.begin(); it != m_entities.end(); it++) {
+	for(auto it = m_entities.begin(); it != m_entities.end(); it++) {
 		it->second->udpate();
 	}
 }
@@ -61,6 +61,23 @@ int Game::attribID() {
     m_lastID++;
     return m_lastID;
 }
+
+map<int, Player*> Game::getEntities() {
+	map<int, Player*> returnMap;
+	for(auto it = m_entities.begin(); it != m_entities.end(); it++) {
+		returnMap[it->first] = it->second.get();
+	}
+	return returnMap;
+}
+
+map<int, Bomb*> Game::getBombs() {
+	map<int, Bomb*> returnMap;
+	for(auto it = m_bombs.begin(); it != m_bombs.end(); it++) {
+		returnMap[it->first] = it->second.get();
+	}
+	return returnMap;
+}
+
 
 void Game::onNotify(int objectID, Subject *sub, Event ev, sf::Uint64 timestamp)
 {
@@ -71,50 +88,71 @@ void Game::onNotify(int objectID, Subject *sub, Event ev, sf::Uint64 timestamp)
 
 
 sf::Packet& operator<<(sf::Packet& packet, Game &game) {
-	packet << *(game.getTerrain().lock());
+	packet << *game.getTerrain();
 	sf::Uint16 numBombs = game.getBombs().size();
 	packet << numBombs;
-	for(std::map<int, bomb_ptr_t>::iterator it = game.getBombs().begin(); it != game.getBombs().end(); it++) {
+	auto gameBombs = game.getBombs();
+	for(auto it = gameBombs.begin(); it != gameBombs.end(); it++) {
 		packet << *it->second;
 	}
 	sf::Uint16 numPlayers = game.getEntities().size();
 	packet << numPlayers;
-	for(std::map<int, entity_ptr_t>::iterator it = game.getEntities().begin(); it != game.getEntities().end(); it++) {
+	for(map<int, Player*>::iterator it = game.getEntities().begin(); it != game.getEntities().end(); it++) {
 		packet << *it->second;
 	}
 	return packet;
 }
 
 sf::Packet& operator>>(sf::Packet& packet, Game &game) {
-	packet >> *(game.getTerrain().lock());
+	packet >> *(game.getTerrain());
 	sf::Uint16 numBombs;
 	packet >> numBombs;
 	for(int i = 0; i < numBombs; i++) {
-		bomb_ptr_t b = std::make_shared<Bomb>(std::weak_ptr<Game>());
+		bomb_ptr_t b = make_unique<Bomb>(&game);
 		packet >> *b;
-		game.addBomb(b->getID(), b);
+		int id = b->getID();
+		game.addBomb(id, move(b));
 	}
 	sf::Uint16 numPlayers;
 	packet >> numPlayers;
 	for(int i = 0; i < numPlayers; i++) {
-		entity_ptr_t p = std::make_shared<Player>();
+		entity_ptr_t p = make_unique<Player>();
 		packet >> *p;
-		game.addEntity(p->getID(), p);
+
+		int id = p->getID();
+		game.addEntity(id, move(p));
 	}
 	return packet;
 }
 
-std::string Game::toString()
+string Game::toString()
 {
-	std::string result;
-	for(std::map<int, bomb_ptr_t>::iterator it = m_bombs.begin(); it != m_bombs.end(); it++) {
+	string result;
+	for(map<int, bomb_ptr_t>::iterator it = m_bombs.begin(); it != m_bombs.end(); it++) {
 		result += it->second->toString();
 		result += "\n";
 	}
-	for(std::map<int, entity_ptr_t>::iterator it = m_entities.begin(); it != m_entities.end(); it++) {
+	for(map<int, entity_ptr_t>::iterator it = m_entities.begin(); it != m_entities.end(); it++) {
 		result += it->second->toString();
 		result += "\n";
 	}
 	return result;
 }
 
+Bomb* Game::getBomb(int id) {
+	try {
+		return m_bombs.at(id).get();
+	} catch(out_of_range e) {
+		cout << "No such bomb with id " << id << endl;
+		return nullptr;
+	}
+}
+
+Player* Game::getEntity(int id) {
+	try {
+		return m_entities.at(id).get();
+	} catch(out_of_range e) {
+		cout << "No such player with id " << id << endl;
+		return nullptr;
+	}
+}

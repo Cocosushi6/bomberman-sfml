@@ -11,11 +11,11 @@ constexpr unsigned int str2int(const char* str, int h = 0)
 	return !str[h] ? 5381 : (str2int(str, h+1) * 33) ^ str[h];
 }
 
-Player::Player(float x, float y, std::weak_ptr<Game> game, int id, std::weak_ptr<PlayerManager> manager) : m_x(x), m_y(y), m_newX(m_x), m_newY(m_y), m_game(game), m_id(id), m_pManager(manager), m_hp(100), m_speed(200.0f), m_moving(false), m_direction("down"), m_dead(false) {
+Player::Player(float x, float y, Game* game, int id, PlayerManager* manager) : m_x(x), m_y(y), m_newX(m_x), m_newY(m_y), m_game(game), m_id(id), m_pManager(manager), m_hp(100), m_speed(200.0f), m_moving(false), m_direction("down"), m_dead(false) {
     
 }
 
-Player::Player() : m_x(-1.0f), m_y(-1.0f), m_newX(m_x), m_newY(m_y), m_game(weak_ptr<Game>()), m_id(-1), m_pManager(weak_ptr<PlayerManager>()), m_hp(100), m_speed(200.0f), m_moving(false), m_direction("down"), m_dead(false) 
+Player::Player() : m_x(-1.0f), m_y(-1.0f), m_newX(m_x), m_newY(m_y), m_game(nullptr), m_id(-1), m_pManager(nullptr), m_hp(100), m_speed(200.0f), m_moving(false), m_direction("down"), m_dead(false) 
 {
 }
 
@@ -44,49 +44,67 @@ void Player::giveDamage(int amount)
 
 int Player::checkCollision(float newX, float newY)
 {
-	//TODO check collision with other players too
-	sf::FloatRect nextBounds(this->getBounds());
-	switch(str2int(m_direction.c_str())) {
-		case str2int("left") :
-			nextBounds.left+=newX;
+	if (m_game != nullptr)
+	{
+		//TODO check collision with other players too
+		sf::FloatRect nextBounds(this->getBounds());
+		switch (str2int(m_direction.c_str()))
+		{
+		case str2int("left"):
+			nextBounds.left += newX;
 			break;
-		case str2int("right") :
-			nextBounds.width+=newX;
+		case str2int("right"):
+			nextBounds.width += newX;
 			break;
-		case str2int("up") :
-			nextBounds.top+=newY;
+		case str2int("up"):
+			nextBounds.top += newY;
 			break;
-		case str2int("down") :
-			nextBounds.height+=newY;
+		case str2int("down"):
+			nextBounds.height += newY;
 			break;
-	}
-	
-	for(std::vector<std::shared_ptr<Tile>> line : m_game.lock()->getTerrain().lock()->getTiles()) {
-		for(std::shared_ptr<Tile> t : line) {
-			if(t->isSolid()) {
-				if(nextBounds.intersects(t->getBounds())) {
+		}
+
+		for (auto line : m_game->getTerrain()->getTiles())
+		{
+			for (auto &&t : line)
+			{
+				if (t->isSolid())
+				{
+					if (nextBounds.intersects(t->getBounds()))
+					{
+						return 1;
+					}
+				}
+			}
+		}
+		auto gameBombs = m_game->getBombs();
+		for (auto it = gameBombs.begin(); it != gameBombs.end(); it++)
+		{
+			if (!this->getBounds().intersects(it->second->getFBounds()))
+			{ //this condition avoids making collision when the player has just put the bomb under its feet
+				if (nextBounds.intersects(it->second->getFBounds()))
+				{
 					return 1;
 				}
 			}
 		}
-	}
-	
-	for(std::map<int, std::shared_ptr<Bomb>>::iterator it = m_game.lock()->getBombs().begin(); it != m_game.lock()->getBombs().end(); it++) {
-		if(!this->getBounds().intersects(it->second->getFBounds()))	{ //this condition avoids making collision when the player has just put the bomb under its feet
-			if(nextBounds.intersects(it->second->getFBounds())) {
-				return 1;
+
+		for (auto &p : m_game->getEntities())
+		{
+			if (p.first != m_id)
+			{
+				if (nextBounds.intersects(p.second->getBounds()))
+				{
+					return 2;
+				}
 			}
 		}
 	}
-	
-	for(auto& p : m_game.lock()->getEntities()) {
-		if(p.first != m_id) {
-			if(nextBounds.intersects(p.second->getBounds())) {
-				return 2;
-			}
-		}
+	else
+	{
+		return 3;
 	}
-	
+
 	return 0;
 }
 
@@ -168,15 +186,15 @@ sf::Packet & operator>>(sf::Packet& packet, Player& player)
 	return packet;
 }
 
-std::string Player::toString()
+string Player::toString()
 {
-	std::string result;
+	string result;
 	result += to_string(m_id) + " ";
 	result += to_string(m_x) + " ";
 	result += to_string(m_y) + " ";
 	result += to_string(m_newX) + " ";
 	result += to_string(m_newY) + " ";
-	result += ((m_moving) ? "moving" : "not_moving") + (std::string)" ";
+	result += ((m_moving) ? "moving" : "not_moving") + (string)" ";
 	result += m_direction;
 	return result;
 }

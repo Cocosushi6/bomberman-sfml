@@ -14,7 +14,7 @@ class Client : public Subject, public Observer {
 	public:
 		Client(sf::IpAddress address, int serverPort);
 		~Client();
-		std::tuple<std::shared_ptr<Game>, int> connect();
+		std::tuple<std::unique_ptr<Game>, int> connect();
 		void poll();
 		int getID();
 		
@@ -30,7 +30,7 @@ class Client : public Subject, public Observer {
 			addToPacket(m_udpDataPacket, args...);
 		}
 		
-		virtual void onNotify(int objectID, Subject *sub, Event ev, sf::Uint64 timestamp);
+		virtual void onNotify(int objectID, Subject *sub, ::Event ev, sf::Uint64 timestamp);
 	private:
 		//in case args is completely empty for the beginng (see sendUDPMessage,sendTCPMessage)
 		void addToPacket(sf::Packet& packet) {
@@ -57,7 +57,7 @@ class Client : public Subject, public Observer {
 		int m_serverPort;
 		bool m_connected = false;
 		
-		std::weak_ptr<Game> m_game;
+		Game* m_game;
 
 		sf::UdpSocket m_udpSock;
 		sf::TcpSocket m_tcpSock;
