@@ -3,6 +3,9 @@
 
 #include <SFML/Graphics.hpp>
 #include <SFML/Network.hpp>
+#include <string>
+#include <functional>
+#include <iostream>
 
 const int TILE_SIZE = 32;
 extern bool hasFocus;
@@ -26,5 +29,19 @@ InputState stateForKey(sf::Keyboard::Key key, float delta, sf::Uint64 timestamp 
 sf::Packet& operator<<(sf::Packet& packet, InputState &state);
 sf::Packet& operator>>(sf::Packet& packet, InputState &state);
 std::ostream& operator<<(std::ostream& stream, InputState &state);
+
+template<typename T>
+void prompt(std::string message, T& outputValue, std::function<bool(T)> validInput) {
+	T tempValue;
+
+	do {
+		std::cout << message << std::endl;
+		std::cin >> tempValue;
+	} while(!validInput(tempValue));
+
+	outputValue = tempValue;
+}
+
+
 
 #endif

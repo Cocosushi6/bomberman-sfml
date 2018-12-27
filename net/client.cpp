@@ -12,7 +12,7 @@
 using namespace std;
 using namespace sf;
 
-Client::Client(sf::IpAddress address, int serverPort) :  m_serverPort(serverPort), m_serverAddr(address),  m_tcpDataPacket(), m_udpDataPacket()
+Client::Client(sf::IpAddress address, int tcpServerPort, int udpServerPort, int udpPort) :  m_tcpServerPort(tcpServerPort), m_udpServerPort(udpServerPort), m_udpPort(udpPort), m_serverAddr(address),  m_tcpDataPacket(), m_udpDataPacket()
 {
 }
 
@@ -24,17 +24,20 @@ Client::~Client()
 tuple<unique_ptr<Game>, int> Client::connect()
 {
 	//server connection
-	Socket::Status status = m_tcpSock.connect(m_serverAddr, m_serverPort);
+	Socket::Status status = m_tcpSock.connect(m_serverAddr, m_tcpServerPort);
 	if(status != Socket::Done) {
 		cout << "Failed to connect tcp socket to server ! Aborting." << endl;
-		return make_tuple(nullptr, -1);
+		return {nullptr, -1};
 	}
-	status = m_udpSock.bind(Socket::AnyPort);
+
+	status = m_udpSock.bind((m_udpPort == -1) ? Socket::AnyPort : m_udpPort);
+
 	if(status != Socket::Done) {
 		cout << "Failed to connect udp socket to server ! Aborting." << endl;
-		return make_tuple(nullptr, -1);
+		return {nullptr, -1};
 	}
-	m_udpPort = m_udpSock.getLocalPort();
+
+	if(m_udpPort == -1) m_udpPort = m_udpSock.getLocalPort();
 	m_connected = true;
 
 	///receive data from server
@@ -42,7 +45,7 @@ tuple<unique_ptr<Game>, int> Client::connect()
 	status = m_tcpSock.receive(gamePacket);
 	if(status != Socket::Done) {
 		cout << "Couldn't receive game data from server, aborting." << endl;
-		return make_tuple(nullptr, -1);
+		return {nullptr, -1};
 	}
 	
 	//transform data
@@ -50,7 +53,7 @@ tuple<unique_ptr<Game>, int> Client::connect()
 	int id;
 	if(!(gamePacket >> id)) {
 		cout << "No id in packet. Aborting. " << endl;
-		return make_tuple(nullptr, -1);
+		return {nullptr, -1};
 	}
 
 	if(id >= 0) {
@@ -61,7 +64,7 @@ tuple<unique_ptr<Game>, int> Client::connect()
 	unique_ptr<Game> game = make_unique<Game>();
 	if(!(gamePacket >> *game)) {
 		cout << "Couldn't extract game data. Aborting." << endl;
-		return make_tuple(nullptr, -1);
+		return {nullptr, -1};
 	}
 	
 	m_game = game.get();
@@ -76,7 +79,7 @@ tuple<unique_ptr<Game>, int> Client::connect()
 	m_udpSock.setBlocking(false);
 	cout << "Connected to server" << endl;
 
-	return make_tuple(move(game), id);
+	return {move(game), id};
 }
 
 void Client::poll()
@@ -291,9 +294,9 @@ int Client::sendTCP(sf::Packet packet)
 
 int Client::sendUDP(sf::Packet packet)
 {
-	sf::Socket::Status status = m_udpSock.send(packet, m_serverAddr, m_serverPort);
+	sf::Socket::Status status = m_udpSock.send(packet, m_serverAddr, m_udpServerPort);
 	while(status != sf::Socket::Done) {
-		status = m_udpSock.send(packet, m_serverAddr, m_serverPort);
+		status = m_udpSock.send(packet, m_serverAddr, m_udpServerPort);
 		if(status != sf::Socket::Done || status != sf::Socket::Partial) {
 			cout << "Error while sending udp socket : status " << status << endl;
 			return -1;

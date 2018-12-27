@@ -24,8 +24,8 @@ class Game : public Subject, public Observer {
 	public:
 		Game();
 		Game(std::unique_ptr<Terrain> terrain, std::map<int, entity_ptr_t> entities);
+		Game(Game && rhs); //move ctor
 
-		int init();
         int attribID();
 		void update(float delta);
 

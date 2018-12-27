@@ -12,7 +12,7 @@
 
 class Client : public Subject, public Observer {
 	public:
-		Client(sf::IpAddress address, int serverPort);
+		Client(sf::IpAddress address, int tcpServerPort, int udpServerPort, int udpPort);
 		~Client();
 		std::tuple<std::unique_ptr<Game>, int> connect();
 		void poll();
@@ -54,7 +54,8 @@ class Client : public Subject, public Observer {
 
 		int m_id = -1;
 		int m_udpPort = -1;
-		int m_serverPort;
+		int m_tcpServerPort = 0;
+		int m_udpServerPort = 0;
 		bool m_connected = false;
 		
 		Game* m_game;

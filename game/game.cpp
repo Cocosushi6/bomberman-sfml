@@ -8,15 +8,15 @@
 using namespace std;
 
 Game::Game() : m_terrain(make_unique<Terrain>()) {
+	m_terrain->addObserver(this);
 }
 
 Game::Game(unique_ptr<Terrain> terrain, map<int, entity_ptr_t> entities) : m_terrain(move(terrain)), m_entities(move(entities)) {
+	m_terrain->addObserver(this);
 }
 
-int Game::init()
-{
+Game::Game(Game && rhs) : m_lastID(rhs.m_lastID), m_initDone(rhs.m_initDone), m_terrain(move(rhs.m_terrain)), m_bombs(move(rhs.m_bombs)), m_entities(move(rhs.m_entities)) {
 	m_terrain->addObserver(this);
-	return 0;
 }
 
 void Game::addEntity(int id, entity_ptr_t entity) {

@@ -12,7 +12,7 @@ using namespace std;
 int main_client();
 int main_server();
 
-int main() {
+int main2() {
 	cout << "Choose 1 for Client or 2 for Server : " << endl;
 	int choice, returnCode;
 	do {
@@ -33,7 +33,6 @@ int main() {
 
 int main_server() {
 	unique_ptr<Game> game = make_unique<Game>();
-	game->init();
 	unique_ptr<Server> server = make_unique<Server>(1665, 1665, game.get());
 	if(server->init() != 0) {
 		return -1;
@@ -57,13 +56,12 @@ int main_client() {
     
 	unique_ptr<Client> client = make_unique<Client>("127.0.0.1", 1665);
 	tuple<unique_ptr<Game>, int> result = client->connect();
-    unique_ptr<Game> game = move(get<0>(result));
+	unique_ptr<Game> game = move(get<0>(result));
 	int ID = get<1>(result);
 	if(game == nullptr || ID == -1) {
 		cout << "couldn't fetch data from server" << endl;
 		return -1;
 	}
-	game->init();
 	client->addObserver(game.get());
 	
 	cout << "game and id fetched successfully" << endl;
@@ -80,23 +78,23 @@ int main_client() {
 	
 	cout << "local player manager initialised" << endl;
 	
-    unique_ptr<Renderer> renderer = make_unique<Renderer>(ID, game.get(), move(window));
+	unique_ptr<Renderer> renderer = make_unique<Renderer>(ID, game.get(), move(window));
 	if(renderer->init() != 0) {
 		cout << "failed to create renderer" << endl;
 		return -2;
 	}
 	game->addObserver(renderer.get());
-    unique_ptr<Input> inputManager = make_unique<Input>(game->getEntity(ID), game.get());
+	unique_ptr<Input> inputManager = make_unique<Input>(game->getEntity(ID), game.get());
 	inputManager->addObserver(playerManager.get()); //To add player state
 	
 	cout << "renderer and input manager initialised" << endl;
 	
-    sf::Clock clock;
+	sf::Clock clock;
 	cout << "Init done ! " << endl;
 	
 	while(renderer->getWindow()->isOpen()) {
 		//TODO take a look at delta pattern and implement it correctly in game
-        sf::Time elapsed = clock.restart();
+		sf::Time elapsed = clock.restart();
         
 		sf::Event event;
 		while(renderer->getWindow()->pollEvent(event)) {

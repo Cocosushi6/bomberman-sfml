@@ -140,10 +140,10 @@ int Server::sendTCP(int clientID, Packet packet)
 			cout << "Error while sending TCP packet to client with id " << clientID << ". Socket status : " <<  str << endl;
 			return -1;
 		}
-		return 0;
 	} else {
 		cout << "Client not ready ! not sending packet. " << endl;
 	}
+	return 0;
 }
 
 int Server::sendUDP(int clientID, Packet packet)

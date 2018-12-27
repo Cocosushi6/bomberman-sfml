@@ -3,6 +3,8 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/System.hpp>
 #include <chrono>
+#include <iostream>
+#include <functional>
 
 extern bool hasFocus = true;
 
@@ -40,5 +42,18 @@ std::ostream& operator<<(std::ostream& stream, InputState& state) {
 	return stream << state.delta << ", " << state.key << ", " << state.state << ", " << state.timestamp;
 }
 
+
+//template specialization
+template<>
+void prompt(std::string message, std::string &outputValue, std::function<bool(std::string)> validInput) {
+	std::string tempValue = "";
+	std::cin.ignore();
+	do {
+		std::cout << message << std::endl;
+		std::getline(std::cin, tempValue); 
+	} while(!validInput(tempValue));
+
+	outputValue = tempValue;
+}
 
 
