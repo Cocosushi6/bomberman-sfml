@@ -53,7 +53,7 @@ void Game::update(float delta) {
 	
 	//update entities
 	for(auto it = m_entities.begin(); it != m_entities.end(); it++) {
-		it->second->udpate();
+		it->second->update();
 	}
 }
 
@@ -62,8 +62,8 @@ int Game::attribID() {
     return m_lastID;
 }
 
-map<int, Player*> Game::getEntities() {
-	map<int, Player*> returnMap;
+map<int, Entity*> Game::getEntities() {
+	map<int, Entity*> returnMap;
 	for(auto it = m_entities.begin(); it != m_entities.end(); it++) {
 		returnMap[it->first] = it->second.get();
 	}
@@ -97,8 +97,8 @@ sf::Packet& operator<<(sf::Packet& packet, Game &game) {
 	}
 	sf::Uint16 numPlayers = game.getEntities().size();
 	packet << numPlayers;
-	for(map<int, Player*>::iterator it = game.getEntities().begin(); it != game.getEntities().end(); it++) {
-		packet << *it->second;
+	for(auto it = game.getEntities().begin(); it != game.getEntities().end(); it++) {
+		packet << *dynamic_cast<Player*>(it->second);
 	}
 	return packet;
 }
@@ -116,7 +116,7 @@ sf::Packet& operator>>(sf::Packet& packet, Game &game) {
 	sf::Uint16 numPlayers;
 	packet >> numPlayers;
 	for(int i = 0; i < numPlayers; i++) {
-		entity_ptr_t p = make_unique<Player>();
+		unique_ptr<Player> p = make_unique<Player>();
 		packet >> *p;
 
 		int id = p->getID();
@@ -148,7 +148,7 @@ Bomb* Game::getBomb(int id) {
 	}
 }
 
-Player* Game::getEntity(int id) {
+Entity* Game::getEntity(int id) {
 	try {
 		return m_entities.at(id).get();
 	} catch(out_of_range e) {

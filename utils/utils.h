@@ -28,6 +28,8 @@ InputState stateForKey(sf::Keyboard::Key key, float delta, sf::Uint64 timestamp 
 
 sf::Packet& operator<<(sf::Packet& packet, InputState &state);
 sf::Packet& operator>>(sf::Packet& packet, InputState &state);
+sf::Packet& operator<<(sf::Packet& packet, sf::Vector2f &vector);
+sf::Packet& operator>>(sf::Packet& packet, sf::Vector2f &vector);
 std::ostream& operator<<(std::ostream& stream, InputState &state);
 
 template<typename T>

@@ -68,7 +68,7 @@ int ClientGame::connect() {
 
     if(m_game == nullptr || m_id == -1) return -1;
 
-    m_player = m_game->getEntity(m_id);
+    m_player = dynamic_cast<Player*>(m_game->getEntity(m_id));
     m_playerManager = make_unique<PlayerManager>(m_game.get(), m_id);
 
     return 0;

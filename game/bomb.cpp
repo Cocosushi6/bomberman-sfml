@@ -27,10 +27,10 @@ void Bomb::explode()
 	if(!m_exploded) {
 		sf::FloatRect horizontal = sf::FloatRect(m_x-32, m_y, 96, 32);
 		sf::FloatRect vertical = sf::FloatRect(m_x, m_y-32, 32, 96);
-			map<int, Player*> gameEntities = m_game->getEntities();
+			map<int, Entity*> gameEntities = m_game->getEntities();
 			for(auto it = gameEntities.begin(); it != gameEntities.end(); it++) {
 				if(it->second->getBounds().intersects(horizontal) || it->second->getBounds().intersects(vertical)) {
-					it->second->giveDamage(50);
+					dynamic_cast<Player*>(it->second)->getCharacteristics()->giveDamage(50);
 				} 
 			}
 			

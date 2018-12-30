@@ -40,7 +40,7 @@ void Server::poll(float delta)
 				//Client is added here, and marked ready once it has sent back its UDP port (see parsePacket method)
 				//TODO add method in game.h to create a new player -> the game should handle the spawn mechanics, etc. and return a new id
 				int newID = m_game->attribID();
-				m_game->addEntity(newID, move(make_unique<Player>(50, 50, m_game, newID)));
+				m_game->addEntity(newID, move(make_unique<Player>(50, 50, 64, 64, m_game, newID)));
 				
 				//send back its id
 				Packet clientData;
@@ -67,7 +67,7 @@ void Server::poll(float delta)
 				if(status == Socket::Done) {
 					parsePacket(packet, client->getIpAddress());
 				} else {
-					cout << "Error while receiving packet of client with id " << it->second->getId() << ", status is " << status << endl;
+					cout << "Error while receiving TCP packet of client with id " << it->second->getId() << ", status is " << status << endl;
 					if(status == Socket::Disconnected) {
 						int discoID = client->getId();
 						cout << "Player with id " << discoID << " was disconnected. " << endl;
@@ -141,7 +141,7 @@ int Server::sendTCP(int clientID, Packet packet)
 			return -1;
 		}
 	} else {
-		cout << "Client not ready ! not sending packet. " << endl;
+		cout << "Client " << clientID << " not ready ! not sending TCP packet. " << endl;
 	}
 	return 0;
 }
@@ -225,7 +225,7 @@ int Server::parsePacket(Packet packet, IpAddress sender)
 				auto player = m_game->getEntity(clientID);
 				if(player != nullptr) {
 					// the + SPRITE_SIZE / 2 is to have the position under the player's feet
-					Vector2<int> bombCoords = toTileCoordinates((int)(player->getX() + SPRITE_SIZE / 2), (int)(player->getY() + SPRITE_SIZE / 2 + 5)) * TILE_SIZE; 
+					Vector2<int> bombCoords = toTileCoordinates((int)(player->getPosition().x + player->getSize().x / 2), (int)(player->getPosition().y + player->getSize().y / 2 + 5)) * TILE_SIZE; 
 					
 					unique_ptr<Bomb> b = make_unique<Bomb>(bombCoords.x, bombCoords.y, BOMB_DURATION, m_game, m_game->attribID());
 					int id = b->getID();
@@ -247,19 +247,19 @@ int Server::parsePacket(Packet packet, IpAddress sender)
 					switch(state.key) {
 						case Keyboard::S :
 							p->move(0.0f, 1.0f, state.delta);
-							p->setDirection("down");
+							p->setDirection(DOWN);
 							break;
 						case Keyboard::Z : 
 							p->move(0.0f, -1.0f, state.delta);
-							p->setDirection("up");
+							p->setDirection(UP);
 							break;
 						case Keyboard::Q :
 							p->move(-1.0f, 0.0f, state.delta);
-							p->setDirection("left");
+							p->setDirection(LEFT);
 							break;
 						case Keyboard::D : 
 							p->move(1.0f, 0.0f, state.delta);
-							p->setDirection("right");
+							p->setDirection(RIGHT);
 							break;
 						default:
 							currentlyMoving = false;
@@ -268,8 +268,8 @@ int Server::parsePacket(Packet packet, IpAddress sender)
 					currentlyMoving = false;
 				}
 				p->setMoving(currentlyMoving);
-				p->udpate();
-				m_udpDataPacket << "PLAYERMOVE" << clientID << state.timestamp << state.delta << p->getX() << p->getY() << p->getDirection() << p->isMoving(); 
+				p->update();
+				m_udpDataPacket << "PLAYERMOVE" << clientID << state.timestamp << state.delta << p->getPosition().x << p->getPosition().y << p->getDirection() << p->isMoving(); 
 // 				cout << "player " << clientID << " moved @ coordinates " << p->getX() << ", " << p->getY() << endl;
 			}
 		}
@@ -289,7 +289,7 @@ void Server::onNotify(int objectID, Subject *sub, ::Event ev, Uint64 timestamp)
 	} else if(ev == EVENT_BOMB_DIED) {
 		m_tcpDataPacket << "REMOVEBOMB" << objectID;
 	} else if(ev == EVENT_PLAYER_JOIN) {
-		m_tcpDataPacket << "ADDPLAYER" << *(m_game->getEntity(objectID));
+		m_tcpDataPacket << "ADDPLAYER" << *(dynamic_cast<Player*>(m_game->getEntity(objectID)));
 	}
 	//TODO check all events fired in game and implement something for them here (eg : ADDPLAYER)
 }

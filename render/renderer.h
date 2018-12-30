@@ -33,7 +33,7 @@ class Renderer : public Observer {
 	public:
 		Renderer(int localID, Game* game, window_ptr_t window);
 		int init();
-		~Renderer();
+		virtual ~Renderer();
         int loadTextures();
 		int loadTileTexture(std::string id);
         int loadEntityTexture(std::string id);
@@ -42,7 +42,7 @@ class Renderer : public Observer {
 		sf::Texture getEntityTexture(std::string id) { return entityTextures[id]; }
 		virtual void onNotify(int objectID, Subject *sub, Event ev, sf::Uint64 timestamp);
 		void addPlayerRenderer(int id) { 
-			m_playerRenderers.insert(std::pair<int, PlayerRenderer>(id, PlayerRenderer(m_game->getEntity(id), m_window.get()))); 
+			m_playerRenderers.insert(std::pair<int, PlayerRenderer>(id, PlayerRenderer(dynamic_cast<Player*>(m_game->getEntity(id)), m_window.get()))); 
 		}
 		sf::RenderWindow* getWindow() { return m_window.get(); }
 	private:

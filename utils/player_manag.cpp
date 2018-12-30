@@ -7,7 +7,7 @@ PlayerManager::PlayerManager(game_ptr_t game, int playerID) : m_game(game), m_pl
 {
 	//TODO return condition does nothing right in constructor, need to replace by init method
 	if(m_game != nullptr) {
-		m_player = m_game->getEntity(playerID);
+		m_player = dynamic_cast<Player*>(m_game->getEntity(playerID));
 	} else {
 		return;
 	}
@@ -17,7 +17,7 @@ PlayerManager::PlayerManager(game_ptr_t game, int playerID) : m_game(game), m_pl
 void PlayerManager::changePlayer(int id)
 {
 	m_playerID = id;
-	m_player = m_game->getEntity(id);
+	m_player = dynamic_cast<Player*>(m_game->getEntity(id));
 }
 
 void PlayerManager::onNotify(int objectID, Subject *sub, Event ev, sf::Uint64 timestamp) {

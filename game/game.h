@@ -13,11 +13,12 @@
 #include <string>
 #include "map.h"
 #include "player.h"
+#include "entity.h"
 #include "bomb.h"
 #include "../utils/subject.h" 
 #include "../utils/observer.h"
 
-typedef std::unique_ptr<Player> entity_ptr_t;
+typedef std::unique_ptr<Entity> entity_ptr_t;
 typedef std::unique_ptr<Bomb> bomb_ptr_t;
 
 class Game : public Subject, public Observer {
@@ -31,10 +32,11 @@ class Game : public Subject, public Observer {
 
         Terrain* getTerrain() { return m_terrain.get(); }
 
+		void addPlayer(int id, entity_ptr_t player);
 		void addEntity(int id, entity_ptr_t entity);
 		void removeEntity(int id);
-        Player* getEntity(int id);
-		std::map<int, Player*> getEntities();
+        Entity* getEntity(int id);
+		std::map<int, Entity*> getEntities();
 
         void addBomb(int id, bomb_ptr_t bomb);
 		void removeBomb(int id) { m_bombs.erase(id);  std::cout << "removed bomb "<< id << std::endl; };

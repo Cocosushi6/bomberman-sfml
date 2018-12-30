@@ -3,6 +3,7 @@
 #include "../utils/utils.h"
 #include "../utils/player_manag.h"
 #include <SFML/Graphics.hpp>
+#include "player_characteristics.h"
 
 using namespace std;
 
@@ -11,35 +12,20 @@ constexpr unsigned int str2int(const char* str, int h = 0)
 	return !str[h] ? 5381 : (str2int(str, h+1) * 33) ^ str[h];
 }
 
-Player::Player(float x, float y, Game* game, int id, PlayerManager* manager) : m_x(x), m_y(y), m_newX(m_x), m_newY(m_y), m_game(game), m_id(id), m_pManager(manager), m_hp(100), m_speed(200.0f), m_moving(false), m_direction("down"), m_dead(false) {
-    
+Player::Player(float x, float y, float width, float height, Game* game, int id, PlayerManager* manager) : Player(sf::Vector2f(x, y), sf::Vector2f(width, height), game, id, manager) 
+{}
+
+Player::Player(sf::Vector2f position, sf::Vector2f size, Game *game, int id, PlayerManager* manager) : Entity(position, size, game, id), m_pManager(manager) {
+	m_data = make_unique<PlayerCharacteristics>(100, false);
 }
 
-Player::Player() : m_x(-1.0f), m_y(-1.0f), m_newX(m_x), m_newY(m_y), m_game(nullptr), m_id(-1), m_pManager(nullptr), m_hp(100), m_speed(200.0f), m_moving(false), m_direction("down"), m_dead(false) 
+Player::Player() : Entity(), m_pManager(nullptr) {
+	m_data = make_unique<PlayerCharacteristics>(100, false);
+}
+
+Player::Player(const Player& other) : Entity(other), m_pManager(other.m_pManager)
 {
-}
-
-Player::~Player()
-{
-}
-
-sf::FloatRect Player::getBounds() {
-	return sf::FloatRect(m_x+10, m_y+10, SPRITE_SIZE-20, SPRITE_SIZE-10);
-}
-
-sf::Vector2<float> Player::getTileCoordinates()
-{
-	return toTileCoordinates(m_x, m_y);
-}
-
-void Player::giveDamage(int amount)
-{
-	cout << "Received damage ! " << endl;
-	m_hp -= amount;
-	if(m_hp <= 0) {
-		m_hp = 0;
-		m_dead = true;
-	}
+	m_data = make_unique<PlayerCharacteristics>(*other.m_data);
 }
 
 int Player::checkCollision(float newX, float newY)
@@ -48,18 +34,18 @@ int Player::checkCollision(float newX, float newY)
 	{
 		//TODO check collision with other players too
 		sf::FloatRect nextBounds(this->getBounds());
-		switch (str2int(m_direction.c_str()))
+		switch (m_direction)
 		{
-		case str2int("left"):
+		case LEFT:
 			nextBounds.left += newX;
 			break;
-		case str2int("right"):
+		case RIGHT:
 			nextBounds.width += newX;
 			break;
-		case str2int("up"):
+		case UP:
 			nextBounds.top += newY;
 			break;
-		case str2int("down"):
+		case DOWN:
 			nextBounds.height += newY;
 			break;
 		}
@@ -106,36 +92,36 @@ int Player::checkCollision(float newX, float newY)
 	}
 
 	return 0;
+
 }
 
-void Player::udpate()
-{
+void Player::update() {
 	float velocity = m_lastDelta * m_speed;
-	if(m_x > m_newX) {
-		if(m_x - m_newX > velocity) {
-			m_x -= velocity;
+	if(m_position.x > m_newPosition.x) {
+		if(m_position.x - m_newPosition.x > velocity) {
+			m_position.x -= velocity;
 		} else {
-			m_x -= m_x - m_newX;
+			m_position.x -= m_position.x - m_newPosition.x;
 		}
 	} else {
-		if(m_newX - m_x > velocity) {
-			m_x += velocity;
+		if(m_newPosition.x - m_position.x > velocity) {
+			m_position.x += velocity;
 		} else {
-			m_x += m_newX - m_x;
+			m_position.x += m_newPosition.x - m_position.x;
 		}
 	}
 	
-	if(m_y > m_newY) {
-		if(m_y - m_newY > velocity) {
-			m_y -= velocity;
+	if(m_position.y > m_newPosition.y) {
+		if(m_position.y - m_newPosition.y > velocity) {
+			m_position.y -= velocity;
 		} else {
-			m_y -= m_y - m_newY;
+			m_position.y -= m_position.y - m_newPosition.y;
 		}
 	} else {
-		if(m_newY - m_y > velocity) {
-			m_y += velocity;
+		if(m_newPosition.y - m_position.y > velocity) {
+			m_position.y += velocity;
 		} else {
-			m_y += m_newY - m_y;
+			m_position.y += m_newPosition.y - m_position.y;
 		}
 	}
 }
@@ -151,38 +137,48 @@ void Player::move(float newX, float newY, float delta) {
 		return;
 	}
 	
-	this->m_newX = newX + m_x;
-	this->m_newY = newY + m_y;
+	this->m_newPosition.x = newX + m_position.x;
+	this->m_newPosition.y = newY + m_position.y;
 	m_lastDelta = delta;
 }
 
-int Player::getHP() { 
-	return m_hp; 
+sf::Packet & operator<<(sf::Packet& packet, Direction &dir) {
+	return packet << (int)dir;
 }
 
+sf::Packet & operator>>(sf::Packet& packet, Direction &dir) {
+	int dirInt;
+	packet >> dirInt;
+	dir = static_cast<Direction>(dirInt);
+	return packet;
+}
 
 sf::Packet & operator<<(sf::Packet& packet, Player& player)
 {
-	return packet << player.getID() << player.getX() << player.getY() << player.getSpeed() << player.getHP() << player.getDirection() << player.isMoving() << player.isDead();
+	//TODO add EntityCharacteristics
+	return packet << player.getID() << player.getPosition().x << player.getPosition().y << player.getSize().x << player.getSize().y << player.getSpeed() << player.getDirection() << player.isMoving() << *player.getCharacteristics();
 }
 
 sf::Packet & operator>>(sf::Packet& packet, Player& player)
 {
 	float x, y, speed;
+	float width, height;
 	int hp, id;
 	bool moving, dead;
-	string direction;
-	packet >> id >> x >> y >> speed >> hp >> direction >> moving >> dead;
+	Direction direction;
+	PlayerCharacteristics charac;	
+	packet >> id >> x >> y >> width >> height >> speed >> direction >> moving >> charac;
 	player.setID(id);
 	player.setX(x);
 	player.setY(y);
 	player.setNewX(x);
 	player.setNewY(y);
+	player.setSize(sf::Vector2f(width, height));
 	player.setSpeed(speed);
-	player.setLife(hp);
 	player.setDirection(direction);
 	player.setMoving(moving);
-	player.setDead(dead);
+	player.getCharacteristics()->setHP(charac.getHP());
+	player.getCharacteristics()->setDead(charac.isDead());
 	return packet;
 }
 
@@ -190,10 +186,10 @@ string Player::toString()
 {
 	string result;
 	result += to_string(m_id) + " ";
-	result += to_string(m_x) + " ";
-	result += to_string(m_y) + " ";
-	result += to_string(m_newX) + " ";
-	result += to_string(m_newY) + " ";
+	result += to_string(m_position.x) + " ";
+	result += to_string(m_position.y) + " ";
+	result += to_string(m_newPosition.x) + " ";
+	result += to_string(m_newPosition.y) + " ";
 	result += ((m_moving) ? "moving" : "not_moving") + (string)" ";
 	result += m_direction;
 	return result;

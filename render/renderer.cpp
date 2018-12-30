@@ -26,54 +26,54 @@ PlayerRenderer::~PlayerRenderer()
 void PlayerRenderer::render(float delta) {
 	if(m_player == nullptr) { cout << "Player renderer has no player!"; }
 
-	if(m_player->isDead()) {
+	if(m_player->getCharacteristics()->isDead()) {
 		m_playerDeathAnimSprite.update(delta);
-		m_playerDeathAnimSprite.getSprite().setPosition(sf::Vector2f(m_player->getX(), m_player->getY()));
+		m_playerDeathAnimSprite.getSprite().setPosition(m_player->getPosition());
 		m_playerDeathAnimSprite.draw(*m_window);
 	} else if(!m_player->isMoving()) {
 		sf::Sprite playerSprite;
 		playerSprite.setTexture(m_playerStatic);
-		switch(str2int(m_player->getDirection().c_str())) {
-			case str2int("left") :
+		switch(m_player->getDirection()) {
+			case LEFT :
 				playerSprite.setTextureRect(sf::IntRect(0, 64, 64, 64));
 				break;
-			case str2int("right") : 
+			case RIGHT : 
 				playerSprite.setTextureRect(sf::IntRect(0, 192, 64, 64));
 				break;
-			case str2int("down") :
+			case DOWN : 
 				playerSprite.setTextureRect(sf::IntRect(0, 128, 64, 64));
 				break;
-			case str2int("up") :
+			case UP :
 				playerSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
 				break;
 		}
 		
-		playerSprite.setPosition(sf::Vector2f(m_player->getX(), m_player->getY()));
+		playerSprite.setPosition(m_player->getPosition());
 		m_window->draw(playerSprite);
 	} else { 
-		switch(str2int(m_player->getDirection().c_str())) {
-			case str2int("left") :
+		switch(m_player->getDirection()) {
+			case LEFT :
 				m_playerAnimSprite.changeLine(1);
 				break;
-			case str2int("right") : 
+			case RIGHT : 
 				m_playerAnimSprite.changeLine(3);
 				break;
-			case str2int("down") :
+			case DOWN :  
 				m_playerAnimSprite.changeLine(2);
 				break;
-			case str2int("up") :
+			case UP :
 				m_playerAnimSprite.changeLine(0);
 				break;
 		}
 		m_playerAnimSprite.update(delta);
-		m_playerAnimSprite.getSprite().setPosition(sf::Vector2f(m_player->getX(), m_player->getY()));
+		m_playerAnimSprite.getSprite().setPosition(m_player->getPosition());
 		m_playerAnimSprite.draw(*m_window);
 	}
 }
 
 Renderer::Renderer(int localID, Game* game, unique_ptr<sf::RenderWindow> window) : m_game(game), m_window(move(window)), m_bombAnim(1, 2, 0.1f, "res/bomb.png", false), m_bombExplAnim(1, 2, 0.1f, "res/bomb_explosion.png", false), localID(localID)
 {
-
+	m_player = dynamic_cast<Player*>(m_game->getEntity(localID));
 }
 
 int Renderer::init()
@@ -172,13 +172,12 @@ void Renderer::render(float delta)
 		it->second.render(delta);
 	}
 	
-	auto localPlayer = m_game->getEntity(localID);
-	string textContent = "HP : " + to_string(localPlayer->getHP());
+	string textContent = "HP : " + to_string(m_player->getCharacteristics()->getHP());
 	m_text.setString(textContent);
 	m_text.setPosition(0, 0);
 	m_window->draw(m_text);
 	
-	if(localPlayer->isDead()) {
+	if(m_player->getCharacteristics()->isDead()) {
 		m_text.setString("You are dead !");
 		m_text.setPosition(400, 304);
 		m_window->draw(m_text);
@@ -189,7 +188,7 @@ void Renderer::onNotify(int objectID, Subject *sub, ::Event ev, sf::Uint64 times
 {
 	if(ev == EVENT_PLAYER_JOIN) {
 		if(m_game != nullptr) {
-			m_playerRenderers.insert(pair<int, PlayerRenderer>(objectID, PlayerRenderer(m_game->getEntity(objectID), m_window.get())));
+			addPlayerRenderer(objectID);
 		}
 	} else if(ev == EVENT_PLAYER_PART) {
 		m_playerRenderers.erase(objectID);

@@ -23,6 +23,7 @@ Client::~Client()
 
 tuple<unique_ptr<Game>, int> Client::connect()
 {
+	cout << "Waiting for server..." << endl;
 	//server connection
 	Socket::Status status = m_tcpSock.connect(m_serverAddr, m_tcpServerPort);
 	if(status != Socket::Done) {
@@ -40,6 +41,8 @@ tuple<unique_ptr<Game>, int> Client::connect()
 	if(m_udpPort == -1) m_udpPort = m_udpSock.getLocalPort();
 	m_connected = true;
 
+	cout << "Connected !" << endl;
+	cout << "Fetching game data from server..." << endl;
 	///receive data from server
 	sf::Packet gamePacket;
 	status = m_tcpSock.receive(gamePacket);
@@ -77,7 +80,6 @@ tuple<unique_ptr<Game>, int> Client::connect()
 	
 	m_tcpSock.setBlocking(false);
 	m_udpSock.setBlocking(false);
-	cout << "Connected to server" << endl;
 
 	return {move(game), id};
 }
@@ -175,7 +177,7 @@ int Client::parsePacket(sf::Packet packet)
 		}
 		else if (descriptor == "ADDPLAYER")
 		{
-			entity_ptr_t p = make_unique<Player>();
+			unique_ptr<Player> p = make_unique<Player>();
 			if (!(packet >> *p))
 				continue;
 
@@ -197,13 +199,13 @@ int Client::parsePacket(sf::Packet packet)
 				cout << "skip" << endl;
 				continue;
 			}
-			Player* curPlayer = m_game->getEntity(entID);
+			Player* curPlayer = dynamic_cast<Player*>(m_game->getEntity(entID));
 			if (curPlayer != nullptr)
 			{
 				sf::Uint64 timestamp;
 				//newX, newY and direction are the values at timestamp, server-side
 				float newX, newY, delta;
-				string direction;
+				Direction direction;
 				bool moving;
 
 				if (!(packet >> timestamp >> delta >> newX >> newY >> direction >> moving))
@@ -221,17 +223,17 @@ int Client::parsePacket(sf::Packet packet)
 							Player oldState = manager->getPStateMgr().get((sf::Uint64)timestamp);
 
 							//Check validity
-							if (oldState.getNewX() != newX)
+							if (oldState.getNewPosition().x != newX)
 							{
-								float oldX = oldState.getX();
+								float oldX = oldState.getPosition().x;
 								curPlayer->setX(newX);
 								curPlayer->setNewX(newX);
 								cout << timestamp;
 								cout << " correcting x, old : " << oldX << ", new : " << newX << ", diff : " << newX - oldX << endl;
 							}
-							if (oldState.getNewY() != newY)
+							if (oldState.getNewPosition().y != newY)
 							{
-								float oldY = oldState.getY();
+								float oldY = oldState.getPosition().y;
 								curPlayer->setY(newY);
 								curPlayer->setNewY(newY);
 								cout << timestamp;
@@ -265,7 +267,7 @@ int Client::parsePacket(sf::Packet packet)
 					curPlayer->setNewY(newY);
 					curPlayer->setDirection(direction);
 					curPlayer->setMoving(moving);
-					curPlayer->udpate();
+					curPlayer->update();
 				}
 			}
 			else

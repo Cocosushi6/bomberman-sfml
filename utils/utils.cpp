@@ -42,6 +42,14 @@ std::ostream& operator<<(std::ostream& stream, InputState& state) {
 	return stream << state.delta << ", " << state.key << ", " << state.state << ", " << state.timestamp;
 }
 
+sf::Packet & operator<<(sf::Packet& packet, sf::Vector2f &vector) {
+	return packet << vector.x << vector.y;
+}
+
+sf::Packet & operator>>(sf::Packet& packet, sf::Vector2f &vector) {
+	return packet >> vector.x >> vector.y;
+}
+
 
 //template specialization
 template<>

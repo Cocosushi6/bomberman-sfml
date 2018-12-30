@@ -13,14 +13,14 @@ Input::Input(Player* player, Game* game) : m_player(player), m_game(game) {}
 
 void Input::parseInput(float delta, Client* sendback) { //TODO find a better way to give sendback (but not as a function param)
 	sf::Uint64 timestamp = getTimestamp();
-	//TODO remove calls to m_player and lock it using auto ptr @ beginning of method
-	if(!m_player->isDead()) {
+
+	if(!m_player->getCharacteristics()->isDead()) {
 		//bool used to set the player to moving if any movement key is pressed
 		bool currentlyMoving = false;
 		
 		if(sf::Keyboard::isKeyPressed(sf::Keyboard::S) && hasFocus) {
 			m_keyStates[sf::Keyboard::S] = true;
-			m_player->setDirection("down");
+			m_player->setDirection(DOWN);
 			m_player->move(0.0f, 1.0f, delta);
 			currentlyMoving = true;
 			
@@ -33,7 +33,6 @@ void Input::parseInput(float delta, Client* sendback) { //TODO find a better way
 			sendback->sendUDPMessage("INPUTSTATE", state); 
 		} else {
 			if(m_keyStates[sf::Keyboard::S]) { //only on key release
-				cout << timestamp << " key released, player pos : " << m_player->getX() << ", " << m_player->getY() << endl;
 				InputState state = stateForKey(sf::Keyboard::S, delta, timestamp);
 				sendback->sendUDPMessage("INPUTSTATE", state);
 				
@@ -42,7 +41,7 @@ void Input::parseInput(float delta, Client* sendback) { //TODO find a better way
 		}
 		if(sf::Keyboard::isKeyPressed(sf::Keyboard::Z) && hasFocus) {
 			m_keyStates[sf::Keyboard::Z] = true;
-			m_player->setDirection("up");
+			m_player->setDirection(UP);
 			m_player->move(0.0f, -1.0f, delta);
 			currentlyMoving = true;
 			
@@ -61,7 +60,7 @@ void Input::parseInput(float delta, Client* sendback) { //TODO find a better way
 		}
 		if(sf::Keyboard::isKeyPressed(sf::Keyboard::Q) && hasFocus) {
 			m_keyStates[sf::Keyboard::Q] = true;
-			m_player->setDirection("left");
+			m_player->setDirection(LEFT);
 			m_player->move(-1.0f, 0.0f, delta);
 			currentlyMoving = true;
 			
@@ -80,7 +79,7 @@ void Input::parseInput(float delta, Client* sendback) { //TODO find a better way
 		
 		if(sf::Keyboard::isKeyPressed(sf::Keyboard::D) && hasFocus) {
 			m_keyStates[sf::Keyboard::D] = true;
-			m_player->setDirection("right");
+			m_player->setDirection(RIGHT);
 			m_player->move(1.0f, 0.0f, delta);
 			currentlyMoving = true;
 			
