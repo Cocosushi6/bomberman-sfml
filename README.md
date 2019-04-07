@@ -10,6 +10,8 @@ To compile, you can download the whole repo using `git clone`, and then use the 
 
 Note: you must have the SFML libs already installed, and if possible the latest version
 
+The graphics are from OpenGameArt.org, with some little modifications. All credits go to the original creators.
+
 Here's a screenshot of the latest working version : 
 
 ![screenshot of game](https://raw.githubusercontent.com/Cocosushi6/bomberman-sfml/master/screenshot.png)
